@@ -1,5 +1,6 @@
 #include "memory.h"
-#include <stdio.h>
+#include "screen.h"
+#include "string.h"
 
 /* ── Virtual RAM ── */
 static char vram[VRAM_SIZE];
@@ -93,17 +94,44 @@ int mem_free_space(void) {
 
 /* ────────────────────────────────────────────
    mem_dump  — debug: full allocation table
+   Uses screen helpers (no stdio/printf).
    ──────────────────────────────────────────── */
 void mem_dump(void) {
-    printf("\n=== MEMORY DUMP ===\n");
-    printf("VRAM size  : %d bytes\n", VRAM_SIZE);
-    printf("vram_top   : %d bytes\n", vram_top);
-    printf("Free       : %d bytes\n", mem_free_space());
-    printf("-------------------\n");
+    char num[20];
+
+    screen_print("\n=== MEMORY DUMP ===\n");
+
+    screen_print("VRAM size  : ");
+    my_int_to_str(VRAM_SIZE, num);
+    screen_print(num);
+    screen_print(" bytes\n");
+
+    screen_print("vram_top   : ");
+    my_int_to_str(vram_top, num);
+    screen_print(num);
+    screen_print(" bytes\n");
+
+    screen_print("Free       : ");
+    my_int_to_str(mem_free_space(), num);
+    screen_print(num);
+    screen_print(" bytes\n");
+
+    screen_print("-------------------\n");
+
     for (int i = 0; i < MAX_BLOCKS; i++) {
-        if (table[i].used)
-            printf("Block %3d | start=%5d | size=%4d\n",
-                   i, table[i].start, table[i].size);
+        if (table[i].used) {
+            screen_print("Block ");
+            my_int_to_str(i, num);
+            screen_print(num);
+            screen_print(" | start=");
+            my_int_to_str(table[i].start, num);
+            screen_print(num);
+            screen_print(" | size=");
+            my_int_to_str(table[i].size, num);
+            screen_print(num);
+            screen_print("\n");
+        }
     }
-    printf("===================\n");
+
+    screen_print("===================\n");
 }

@@ -1,9 +1,21 @@
-CC     = gcc
-CFLAGS = -Wall -Wextra -std=c11 -g
-TARGET = miniOS
+CC      = gcc
+CFLAGS  = -Wall -Wextra -std=c11 -g
+TARGET  = miniOS
 
-SRCS = src/shell.c src/math.c src/string.c src/memory.c src/screen.c src/keyboard.c
+SRCS =  src/main.c      \
+        src/shell.c     \
+        src/fs.c        \
+        src/scheduler.c \
+        src/parser.c    \
+        src/math.c      \
+        src/string.c    \
+        src/memory.c    \
+        src/screen.c    \
+        src/keyboard.c
+
 OBJS = $(SRCS:.c=.o)
+
+.PHONY: all clean run
 
 all: $(TARGET)
 
@@ -18,5 +30,3 @@ clean:
 
 run: all
 	./$(TARGET)
-
-.PHONY: all clean run
