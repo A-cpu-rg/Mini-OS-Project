@@ -1,9 +1,8 @@
 /*
  * keyboard.c — Input using read() syscall (no scanf)
- * Phase 1: Mini OS
  */
 #include "keyboard.h"
-#include <unistd.h>
+#include <unistd.h> 
 
 /*
  * kb_read_line — reads one line from stdin into buf.

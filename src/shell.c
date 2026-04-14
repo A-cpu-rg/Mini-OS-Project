@@ -27,7 +27,7 @@ static void out_append(const char *s) {
         opos += slen;
     }
 }
-
+f
 static void out_append_int(int n) {
     char buf[20];
     my_int_to_str(n, buf);
