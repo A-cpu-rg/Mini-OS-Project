@@ -1,0 +1,374 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>MiniOS — Phase 1 Shell</title>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0d1117;
+      --surface:   #161b22;
+      --border:    #30363d;
+      --green:     #3fb950;
+      --green-dim: #238636;
+      --cyan:      #79c0ff;
+      --yellow:    #e3b341;
+      --red:       #f85149;
+      --muted:     #8b949e;
+      --text:      #c9d1d9;
+      --prompt:    #58a6ff;
+    }
+
+    body {
+      background: var(--bg);
+      font-family: 'Inter', sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 24px 16px 40px;
+      color: var(--text);
+    }
+
+    /* ── Header ── */
+    header {
+      width: 100%;
+      max-width: 860px;
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+      padding-bottom: 18px;
+      border-bottom: 1px solid var(--border);
+    }
+    .logo {
+      width: 40px; height: 40px;
+      background: linear-gradient(135deg, #238636, #3fb950);
+      border-radius: 10px;
+      display: flex; align-items: center; justify-content: center;
+      font-family: 'JetBrains Mono', monospace;
+      font-weight: 700; font-size: 18px; color: #fff;
+      flex-shrink: 0;
+    }
+    .header-text h1 { font-size: 18px; font-weight: 600; color: var(--text); }
+    .header-text p  { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .badge {
+      margin-left: auto;
+      background: var(--green-dim);
+      color: var(--green);
+      font-size: 11px; font-weight: 600;
+      padding: 3px 10px; border-radius: 20px;
+      letter-spacing: .5px;
+    }
+
+    /* ── Terminal window ── */
+    .window {
+      width: 100%; max-width: 860px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 8px 40px rgba(0,0,0,.6);
+    }
+
+    .titlebar {
+      display: flex; align-items: center; gap: 8px;
+      background: #1c2128;
+      padding: 12px 16px;
+      border-bottom: 1px solid var(--border);
+      user-select: none;
+    }
+    .dot { width: 12px; height: 12px; border-radius: 50%; }
+    .dot.red    { background: #ff5f57; }
+    .dot.yellow { background: #febc2e; }
+    .dot.green  { background: #28c840; }
+    .titlebar-label {
+      margin-left: auto; margin-right: auto;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 12px; color: var(--muted);
+    }
+
+    /* ── Output area ── */
+    #output {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      line-height: 1.7;
+      padding: 20px 24px 8px;
+      min-height: 340px;
+      max-height: 520px;
+      overflow-y: auto;
+      white-space: pre-wrap;
+      word-break: break-word;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+    #output::-webkit-scrollbar { width: 6px; }
+    #output::-webkit-scrollbar-track { background: transparent; }
+    #output::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+    /* ── Line types ── */
+    .line-prompt  { color: var(--prompt); }
+    .line-cmd     { color: var(--text); }
+    .line-output  { color: var(--green); }
+    .line-error   { color: var(--red); }
+    .line-info    { color: var(--cyan); }
+    .line-muted   { color: var(--muted); }
+    .line-yellow  { color: var(--yellow); }
+
+    /* ── Input row ── */
+    .input-row {
+      display: flex; align-items: center; gap: 10px;
+      padding: 12px 24px 16px;
+      border-top: 1px solid var(--border);
+      background: #161b22;
+    }
+    .ps1 {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      color: var(--prompt);
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    #cmd-input {
+      flex: 1;
+      background: transparent;
+      border: none; outline: none;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 13.5px;
+      color: var(--text);
+      caret-color: var(--green);
+    }
+    #cmd-input::placeholder { color: var(--muted); }
+
+    /* ── Helper chips ── */
+    .chips {
+      width: 100%; max-width: 860px;
+      display: flex; flex-wrap: wrap; gap: 8px;
+      margin-top: 14px;
+    }
+    .chip {
+      background: #1c2128;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 11.5px;
+      padding: 5px 12px; border-radius: 6px;
+      cursor: pointer;
+      transition: border-color .15s, color .15s;
+      user-select: none;
+    }
+    .chip:hover { border-color: var(--prompt); color: var(--prompt); }
+
+    /* ── Fade-in animation ── */
+    @keyframes fadeIn { from { opacity:0; transform:translateY(4px); } to { opacity:1; transform:none; } }
+    .new-line { animation: fadeIn .12s ease-out; }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="logo">$</div>
+    <div class="header-text">
+      <h1>MiniOS — Phase 1 Shell</h1>
+      <p>Basic shell · input/output · argument parsing · math</p>
+    </div>
+    <span class="badge">PHASE 1</span>
+  </header>
+
+  <div class="window">
+    <div class="titlebar">
+      <span class="dot red"></span>
+      <span class="dot yellow"></span>
+      <span class="dot green"></span>
+      <span class="titlebar-label">miniOS — bash</span>
+    </div>
+    <div id="output"></div>
+    <div class="input-row">
+      <span class="ps1">miniOS&gt;&nbsp;</span>
+      <input id="cmd-input" type="text" autocomplete="off" spellcheck="false" autofocus placeholder="type a command…" />
+    </div>
+  </div>
+
+  <div class="chips">
+    <span class="chip" onclick="runChip('help')">help</span>
+    <span class="chip" onclick="runChip('echo Hello World')">echo Hello World</span>
+    <span class="chip" onclick="runChip('math 10 + 5')">math 10 + 5</span>
+    <span class="chip" onclick="runChip('math 6 * 7')">math 6 * 7</span>
+    <span class="chip" onclick="runChip('math 20 / 4')">math 20 / 4</span>
+    <span class="chip" onclick="runChip('math 10 - 3')">math 10 - 3</span>
+    <span class="chip" onclick="runChip('clear')">clear</span>
+    <span class="chip" onclick="runChip('exit')">exit</span>
+  </div>
+
+<script>
+  /* ── History ── */
+  const history = [];
+  let histIdx = -1;
+
+  /* ── Output helpers ── */
+  const out = document.getElementById('output');
+
+  function addLine(text, cls = 'line-output') {
+    const div = document.createElement('div');
+    div.className = cls + ' new-line';
+    div.textContent = text;
+    out.appendChild(div);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  function addBlank() { addLine('', 'line-muted'); }
+
+  /* ── String utility (mirrors string.c) ── */
+  function myStrToInt(s) { return parseInt(s, 10) || 0; }
+
+  /* ── Math module (mirrors math.c) ── */
+  function myMultiply(a, b) {
+    let result = 0, neg = false;
+    if (b < 0) { b = -b; neg = !neg; }
+    if (a < 0) { a = -a; neg = !neg; }
+    for (let i = 0; i < b; i++) result += a;
+    return neg ? -result : result;
+  }
+
+  function myDivide(a, b) {
+    if (b === 0) return null;
+    let neg = false;
+    if (a < 0) { a = -a; neg = !neg; }
+    if (b < 0) { b = -b; neg = !neg; }
+    let result = 0;
+    while (a >= b) { a -= b; result++; }
+    return neg ? -result : result;
+  }
+
+  /* ── Parser (mirrors parser.c) ── */
+  function parseCommand(input) {
+    const trimmed = input.trim();
+    if (!trimmed) return null;
+    const tokens = trimmed.split(/\s+/);
+    return { cmd: tokens[0].toLowerCase(), args: tokens.slice(1), argc: tokens.length - 1 };
+  }
+
+  /* ── Command handlers ── */
+  function handleHelp() {
+    addLine('MiniOS Phase 1  --  Available Commands', 'line-info');
+    addLine('──────────────────────────────────────', 'line-muted');
+    addLine('  help              Show this menu',            'line-output');
+    addLine('  echo <text...>    Print text to screen',      'line-output');
+    addLine('  math <a> <op> <b> Arithmetic: op is + - * /', 'line-output');
+    addLine('  clear             Clear the terminal',        'line-output');
+    addLine('  exit              Quit MiniOS',               'line-output');
+  }
+
+  function handleEcho(args) {
+    if (args.length === 0) { addLine('', 'line-output'); return; }
+    addLine(args.join(' '), 'line-output');
+  }
+
+  function handleMath(args) {
+    if (args.length < 3) {
+      addLine('Usage: math <a> <op> <b>   (op: + - * /)', 'line-error');
+      return;
+    }
+    const a  = myStrToInt(args[0]);
+    const op = args[1];
+    const b  = myStrToInt(args[2]);
+    let   r;
+
+    if      (op === '+') r = a + b;
+    else if (op === '-') r = a - b;
+    else if (op === '*') r = myMultiply(a, b);
+    else if (op === '/') {
+      r = myDivide(a, b);
+      if (r === null) { addLine('Error: division by zero', 'line-error'); return; }
+    }
+    else {
+      addLine('Error: unknown operator. Use + - * /', 'line-error');
+      return;
+    }
+    addLine(`${a} ${op} ${b} = ${r}`, 'line-yellow');
+  }
+
+  function handleClear() {
+    out.innerHTML = '';
+  }
+
+  /* ── Main executor ── */
+  function execLine(raw) {
+    const trimmed = raw.trim();
+    if (!trimmed) return true;
+
+    /* echo the prompt + command */
+    addLine('miniOS> ' + raw, 'line-prompt');
+
+    const parsed = parseCommand(raw);
+    if (!parsed) return true;
+
+    switch (parsed.cmd) {
+      case 'help':  handleHelp();              break;
+      case 'echo':  handleEcho(parsed.args);   break;
+      case 'math':  handleMath(parsed.args);   break;
+      case 'clear': handleClear();             return true;
+      case 'exit':
+      case 'quit':
+        addLine('Goodbye! MiniOS shutting down.', 'line-muted');
+        addBlank();
+        document.getElementById('cmd-input').disabled = true;
+        return false;
+      default:
+        addLine(`Unknown command: '${parsed.cmd}'  --  type 'help'`, 'line-error');
+    }
+
+    addBlank();
+    return true;
+  }
+
+  /* ── Boot banner ── */
+  function boot() {
+    addLine('MiniOS Phase 1 — Shell Ready', 'line-info');
+    addLine('────────────────────────────', 'line-muted');
+    addLine("Type 'help' for available commands.", 'line-muted');
+    addBlank();
+  }
+
+  /* ── Chip helper ── */
+  function runChip(cmd) {
+    const input = document.getElementById('cmd-input');
+    input.value = cmd;
+    input.focus();
+    submit();
+  }
+
+  /* ── Input handling ── */
+  function submit() {
+    const input = document.getElementById('cmd-input');
+    const val   = input.value;
+    if (!val.trim()) return;
+
+    history.unshift(val);
+    histIdx = -1;
+    input.value = '';
+
+    execLine(val);
+  }
+
+  document.getElementById('cmd-input').addEventListener('keydown', function(e) {
+    if (e.key === 'Enter') {
+      submit();
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      if (histIdx < history.length - 1) { histIdx++; this.value = history[histIdx]; }
+    } else if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (histIdx > 0) { histIdx--; this.value = history[histIdx]; }
+      else { histIdx = -1; this.value = ''; }
+    }
+  });
+
+  boot();
+</script>
+</body>
+</html>

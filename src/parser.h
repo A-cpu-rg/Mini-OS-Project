@@ -1,18 +1,15 @@
 #ifndef PARSER_H
 #define PARSER_H
 
-#define PARSER_MAX_ARGS   10
-#define PARSER_MAX_LEN   256
+#define PARSER_MAX_ARGS  8
+#define PARSER_MAX_LEN  64
 
 typedef struct {
-    char  cmd [PARSER_MAX_LEN];
-    char  args[PARSER_MAX_ARGS][PARSER_MAX_LEN];
-    int   argc;                 /* number of arguments (not counting cmd) */
+    char cmd[PARSER_MAX_LEN];
+    char args[PARSER_MAX_ARGS][PARSER_MAX_LEN];
+    int  argc;
 } Command;
 
-/* Parses null-terminated input string into a Command.
-   Modifies input in-place (inserts '\0' at delimiters).
-   Returns 1 on success, 0 if input is empty/blank.          */
 int parse_command(char *input, Command *cmd);
 
-#endif /* PARSER_H */
+#endif
