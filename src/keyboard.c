@@ -5,17 +5,13 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <errno.h>
+#include <sys/select.h>
 
                                                  
 static char kb_linebuf[MAX_INPUT];
 static int  kb_pos = 0;
 
-  
-                                                     
-                                                        
-                                                                    
-   
-int kb_read_line(char *buf) {
+static int read_line_blocking(char *buf) {
     int i = 0;
     char c;
     while (i < MAX_INPUT - 1) {
@@ -31,11 +27,31 @@ int kb_read_line(char *buf) {
     return i;
 }
 
+int kb_read_line(char *buf) {
+    return read_line_blocking(buf);
+}
+
+int readLine(char *buf) {
+    return read_line_blocking(buf);
+}
+
 int kb_enable_nonblocking(void) {
     int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
     if (flags < 0) return 0;
     if (fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK) < 0) return 0;
     return 1;
+}
+
+int keyPressed(void) {
+    fd_set readfds;
+    struct timeval tv;
+
+    FD_ZERO(&readfds);
+    FD_SET(STDIN_FILENO, &readfds);
+    tv.tv_sec = 0;
+    tv.tv_usec = 0;
+
+    return select(STDIN_FILENO + 1, &readfds, (fd_set *)0, (fd_set *)0, &tv) > 0;
 }
 
 int kb_poll_line(char *out, int out_max) {

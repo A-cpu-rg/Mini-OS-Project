@@ -18,6 +18,18 @@
 
 #define SHELL_INPUT_SIZE 256
 #define SHELL_PROMPT_PATH "/home"
+#define SHELL_TITLE "MiniOS v2.0"
+
+static void shell_print_prompt(void);
+
+static void shell_print_ok_file(const char *prefix, const char *name, const char *suffix) {
+    screen_print("[OK] ");
+    screen_print(prefix);
+    screen_print(" '");
+    screen_print(name);
+    screen_print("'");
+    screen_print_line(suffix);
+}
 
 static void shell_print_prompt(void) {
     screen_print("miniOS:");
@@ -28,7 +40,7 @@ static void shell_print_prompt(void) {
                                                               
 
 static void handle_help(void) {
-    screen_print_title("MiniOS v2.0 — Commands");
+    screen_print_title(SHELL_TITLE " - Commands");
     screen_print_line("help                 Show this menu");
     screen_print_line("echo <text...>       Print text");
     screen_print_line("math <a> <op> <b>    Arithmetic: op is + - * /");
@@ -36,6 +48,7 @@ static void handle_help(void) {
     screen_print_line("write <file> <data>  Write data to file (overwrites)");
     screen_print_line("read <file>          Read file contents");
     screen_print_line("ls                   List files");
+    screen_print_line("delete <file>        Delete file");
     screen_print_line("mem                  Show memory status");
     screen_print_line("run                  Run one scheduler tick (demo)");
     screen_print_line("clear                Clear screen + show boot banner");
@@ -86,10 +99,18 @@ static void handle_math(Command *cmd) {
 static void handle_touch(Command *cmd) {
     if (cmd->argc < 1) { screen_print_error("Usage: touch <filename>"); return; }
     if (fs_touch(cmd->args[0])) {
-        screen_print("["); screen_print("OK"); screen_print("] ");
-        screen_print("File '"); screen_print(cmd->args[0]); screen_print_line("' created");
+        shell_print_ok_file("File", cmd->args[0], " created");
     } else {
         screen_print_error("cannot create file");
+    }
+}
+
+static void handle_delete(Command *cmd) {
+    if (cmd->argc < 1) { screen_print_error("Usage: delete <filename>"); return; }
+    if (fs_delete(cmd->args[0])) {
+        shell_print_ok_file("File", cmd->args[0], " deleted");
+    } else {
+        screen_print_error("file not found");
     }
 }
 
@@ -112,8 +133,7 @@ static void handle_ls(void) {
         screen_print(names[i]);
 
                                                  
-        int pad = 12 - my_strlen(names[i]);
-        if (pad < 1) pad = 1;
+        int pad = my_clamp(12 - my_strlen(names[i]), 1, 12);
         for (int k = 0; k < pad; k++) screen_print(" ");
 
         screen_print("(");
@@ -141,8 +161,7 @@ static void handle_write(Command *cmd) {
     char data_buf[256];
     build_rest_args(cmd, 1, data_buf, 256);
     if (fs_write(cmd->args[0], data_buf)) {
-        screen_print("["); screen_print("OK"); screen_print("] ");
-        screen_print("Data written to '"); screen_print(cmd->args[0]); screen_print_line("'");
+        shell_print_ok_file("Data written to", cmd->args[0], "");
     } else {
         screen_print_error("write failed (out of RAM / invalid name)");
     }
@@ -177,8 +196,9 @@ static void handle_mem(void) {
 }
 
 static void shell_boot_banner(void) {
-    screen_print("\033[2J\033[H");
-    screen_print_title("MiniOS v2.0 Loaded");
+    screen_clear();
+    screen_set_cursor(1, 1);
+    screen_print_title(SHELL_TITLE " Loaded");
     screen_print_line("Type 'help' to begin");
     screen_newline();
 }
@@ -214,6 +234,7 @@ int shell_exec_line(char *raw) {
     else if (my_strcmp(cmd.cmd, "write") == 0) handle_write(&cmd);
     else if (my_strcmp(cmd.cmd, "read")  == 0) handle_read(&cmd);
     else if (my_strcmp(cmd.cmd, "ls")    == 0) handle_ls();
+    else if (my_strcmp(cmd.cmd, "delete") == 0) handle_delete(&cmd);
     else if (my_strcmp(cmd.cmd, "mem")   == 0) handle_mem();
     else if (my_strcmp(cmd.cmd, "run")   == 0) handle_run();
     else if (my_strcmp(cmd.cmd, "clear") == 0) {
@@ -236,35 +257,20 @@ int shell_exec_line(char *raw) {
 void run_shell(void) {
     char input_buf[SHELL_INPUT_SIZE];
     int  prompt_shown = 0;
-    int  tick = 0;
-    int  last_counter = -1;
 
     kb_enable_nonblocking();
 
     while (1) {
-                                           
         run_all_tasks();
-        tick++;
 
         if (!prompt_shown) {
             shell_print_prompt();
             prompt_shown = 1;
         }
 
-                                                                     
-        if ((tick % 120) == 0 && prompt_shown && !kb_input_in_progress()) {
-            int c = scheduler_counter_value();
-            if (c != last_counter) {
-                last_counter = c;
-                screen_newline();
-                screen_print("[Scheduler] Counter: ");
-                {
-                    char bufc[32];
-                    my_int_to_str(c, bufc);
-                    screen_print_line(bufc);
-                }
-                shell_print_prompt();
-            }
+        if (!keyPressed()) {
+            usleep(10000);
+            continue;
         }
 
         int len = kb_poll_line(input_buf, SHELL_INPUT_SIZE);

@@ -4,6 +4,8 @@
 #define MAX_INPUT 256
 
 int kb_read_line(char *buf);
+int readLine(char *buf);
+int keyPressed(void);
 
                                                            
 int kb_enable_nonblocking(void);

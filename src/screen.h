@@ -4,6 +4,9 @@
 void screen_print(const char *s);
 void screen_print_line(const char *s);
 void screen_newline(void);
+void screen_putc(char c);
+void screen_clear(void);
+void screen_set_cursor(int x, int y);
 
                                              
 void screen_print_sep(const char *ch, int count);

@@ -1,88 +1,68 @@
-# MiniOS — Custom Terminal-Based Operating System in C
+# MiniOS - Custom Terminal Operating System in C
 
 ## Overview
-MiniOS is a small terminal-based “operating system” written in C that implements a custom shell and core OS-like subsystems without relying on standard library I/O. Phase 2 extends the system with a virtual memory allocator, an in-memory virtual file system, a cooperative task scheduler, and a structured terminal UI for clearer output and debugging.
+MiniOS is a small Track B project: a terminal-based mini operating system written in C. It uses five custom libraries for string handling, math, memory, screen output, and keyboard input, then combines them into a shell with a virtual file system and a cooperative scheduler.
 
-## Features
-- **Custom Shell (non-blocking)**: command loop with structured parsing and clean command dispatch
-- **Virtual Memory System**: 1MB RAM arena with a custom allocator (no `malloc/free`)
-- **Virtual File System**: in-memory files with `touch`, `write`, `read`, `ls`
-- **Task Scheduler**: cooperative background counter task (demonstration “tick” via `run`)
-- **Structured Terminal UI**: formatted output with status tags like `[OK]` / `[ERROR]`
-- **Memory Stats**: `mem` command to inspect allocator usage
+## What it demonstrates
+- Custom `string`, `math`, `memory`, `screen`, and `keyboard` libraries
+- A non-blocking shell loop
+- In-memory virtual files backed by the custom allocator
+- A background scheduler task that keeps running while the shell stays usable
+- Terminal output and input handled without `string.h`, `math.h`, `malloc`, or `free`
 
-## Architecture
-MiniOS is split into small modules, each isolated behind a header:
-
-- **`shell.c`**: REPL loop, command routing, user-facing UX
-- **`parser.c`**: tokenization + `Command` structure construction
-- **`string.c`**: custom string utilities (no `<string.h>`)
-- **`math.c`**: arithmetic helpers used by the `math` command
-- **`memory.c`**: 1MB memory arena + allocator + memory statistics
-- **`filesystem.c`**: virtual in-memory files and basic file operations
-- **`scheduler.c`**: cooperative scheduler + background demo task(s)
-- **`screen.c`**: all terminal output via `write()`, including UI helpers
-- **`keyboard.c`**: input via `read()`
+## How it works
+The flow is simple and easy to explain in evaluation:
+1. Keyboard reads user input.
+2. Parser splits the line into command and arguments.
+3. Shell decides which command to run.
+4. Memory allocates or frees file data.
+5. Math helps with arithmetic and boundary checks.
+6. Screen prints the final result to the terminal.
 
 ## Commands
 | Command | Description |
 |---|---|
 | `help` | Show available commands |
 | `echo <text...>` | Print text |
-| `math <a> <op> <b>` | Arithmetic (`+` `-` `*` `/`) |
-| `clear` | Clear screen + show boot banner |
+| `math <a> <op> <b>` | Arithmetic using `+`, `-`, `*`, `/` |
+| `touch <file>` | Create a file in virtual memory |
+| `write <file> <data...>` | Write or overwrite file contents |
+| `read <file>` | Read a file from virtual memory |
+| `ls` | List all files with sizes |
+| `delete <file>` | Delete a file and free its memory |
+| `run` | Run one scheduler tick |
+| `mem` | Show virtual memory usage |
+| `clear` | Clear the terminal and restart the banner |
 | `exit` | Quit MiniOS |
-| `touch <file>` | Create file (if missing) |
-| `write <file> <data...>` | Write data to a file (overwrites) |
-| `read <file>` | Read file contents |
-| `ls` | List files (with sizes) |
-| `run` | Run one scheduler tick (demo) |
-| `mem` | Show memory/allocator status |
 
-## Sample Usage
-```
-## MiniOS v2.0 Loaded
---------------------------------
-Type 'help' to begin
-
-miniOS:/home$ help
-[OK] MiniOS v2.0 — Commands
-...
-
-miniOS:/home$ touch notes.txt
-[OK] File 'notes.txt' created
-
-miniOS:/home$ write notes.txt Hello from MiniOS
-[OK] Data written to 'notes.txt'
-
-miniOS:/home$ read notes.txt
------ FILE: notes.txt -----
-Hello from MiniOS
-
-miniOS:/home$ ls
-[1] notes.txt    (17 bytes)
-
-miniOS:/home$ run
-[Scheduler] Counter: 120
-
-miniOS:/home$ mem
-[OK] Memory Status
-...
-```
-
-## Build & Run
+## Build and Run
 ```bash
 make
-make run
+./miniOS
+```
+
+Optional cleanup:
+```bash
 make clean
 ```
 
-## Constraints
-- No `<string.h>`, `<math.h>`
-- No `malloc/free`
-- I/O is done via raw system calls (`read`, `write`)
+## Submission Notes
+- This project follows Track B: Mini Operating System.
+- Files are stored only in RAM, so they reset when the program closes.
+- The scheduler is cooperative, not preemptive.
+- The virtual RAM size is 1 MB.
 
-## Known Limitations
-- No persistent storage (VFS is in-memory only)
-- Cooperative scheduling (not preemptive)
-- Limited RAM (1MB arena)
+## Known Issues
+- No persistent storage yet.
+- No real multitasking or process isolation.
+- Input handling is terminal-based, so it depends on a POSIX-like environment.
+
+## Demo Checklist
+- `help` shows the full command list
+- `touch`, `write`, `read`, `ls`, and `delete` work together
+- `run` shows the background counter
+- `mem` shows allocator usage
+- `clear` redraws the boot banner cleanly
+
+## Screenshot / Recording
+- Add at least 3 screenshots or a 1-3 minute screen recording before submission.

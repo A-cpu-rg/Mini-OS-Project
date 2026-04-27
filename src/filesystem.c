@@ -7,6 +7,7 @@
    
 #include "filesystem.h"
 #include "memory.h"
+#include "math.h"
 #include "string.h"
 
 static File files[FS_MAX_FILES];
@@ -29,8 +30,7 @@ void fs_init(void) {
 static int name_valid(const char *name) {
     if (!name) return 0;
     if (name[0] == '\0') return 0;
-    if (my_strlen(name) >= FS_NAME_MAX) return 0;
-    return 1;
+    return my_in_bounds(my_strlen(name), 1, FS_NAME_MAX - 1);
 }
 
 static int find_file(const char *name) {
@@ -149,4 +149,3 @@ int fs_delete(const char *name) {
     files[idx].data = (char *)0;
     return 1;
 }
-
