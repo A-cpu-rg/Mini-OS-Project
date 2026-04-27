@@ -1,21 +1,27 @@
-/*
- * keyboard.c — Input using read() syscall (no scanf)
- */
+  
+                                                     
+   
 #include "keyboard.h"
-#include <unistd.h> 
+#include <unistd.h>
+#include <fcntl.h>
+#include <errno.h>
 
-/*
- * kb_read_line — reads one line from stdin into buf.
- * Stops at newline or EOF. Strips the trailing newline.
- * Returns number of characters read, or -1 on EOF with empty input.
- */
+                                                 
+static char kb_linebuf[MAX_INPUT];
+static int  kb_pos = 0;
+
+  
+                                                     
+                                                        
+                                                                    
+   
 int kb_read_line(char *buf) {
     int i = 0;
     char c;
     while (i < MAX_INPUT - 1) {
         int r = (int)read(STDIN_FILENO, &c, 1);
         if (r <= 0) {
-            if (i == 0) return -1;  /* EOF, nothing read */
+            if (i == 0) return -1;                         
             break;
         }
         if (c == '\n') break;
@@ -23,4 +29,47 @@ int kb_read_line(char *buf) {
     }
     buf[i] = '\0';
     return i;
+}
+
+int kb_enable_nonblocking(void) {
+    int flags = fcntl(STDIN_FILENO, F_GETFL, 0);
+    if (flags < 0) return 0;
+    if (fcntl(STDIN_FILENO, F_SETFL, flags | O_NONBLOCK) < 0) return 0;
+    return 1;
+}
+
+int kb_poll_line(char *out, int out_max) {
+    if (!out || out_max <= 1) return 0;
+
+    while (1) {
+        char c;
+        ssize_t r = read(STDIN_FILENO, &c, 1);
+        if (r == 0) {
+            return -1;          
+        }
+        if (r < 0) {
+            if (errno == EAGAIN || errno == EWOULDBLOCK) break;
+            return -1;
+        }
+
+        if (c == '\n') {
+            int len = kb_pos;
+            if (len > out_max - 1) len = out_max - 1;
+            for (int i = 0; i < len; i++) out[i] = kb_linebuf[i];
+            out[len] = '\0';
+            kb_pos = 0;
+            return len;
+        }
+
+        if (kb_pos < MAX_INPUT - 1) {
+            kb_linebuf[kb_pos++] = c;
+        }
+                                                  
+    }
+
+    return 0;
+}
+
+int kb_input_in_progress(void) {
+    return (kb_pos > 0) ? 1 : 0;
 }

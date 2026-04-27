@@ -1,46 +1,46 @@
-/*
- * string.c — Custom string library (no <string.h>)
- */
+  
+                                                   
+   
 #include "string.h"
 
 int my_strlen(const char *s) {
     int i = 0;
-    while (s[i] != '\0') i++;  /* count chars until null terminator */
+    while (s[i] != '\0') i++;                                         
     return i;
 }
 
 void my_strcpy(char *dest, const char *src) {
     int i = 0;
-    while (src[i] != '\0') { dest[i] = src[i]; i++; } /* copy chars until null terminator */
-    dest[i] = '\0';  /* add null terminator at the end */
+    while (src[i] != '\0') { dest[i] = src[i]; i++; }                                       
+    dest[i] = '\0';                                      
 }
 
 int my_strcmp(const char *a, const char *b) {
-    int i = 0; /* compare chars until null terminator of either string */
-    while (a[i] != '\0' && b[i] != '\0') { /* compare chars at position i */
-        if (a[i] != b[i]) return a[i] - b[i]; /* if chars differ, return their difference */
-        i++; /* move to next char */
+    int i = 0;                                                           
+    while (a[i] != '\0' && b[i] != '\0') {                                  
+        if (a[i] != b[i]) return a[i] - b[i];                                               
+        i++;                        
     }
-    return a[i] - b[i]; /* if we reached the end of one string, return difference of null terminator and next char */
+    return a[i] - b[i];                                                                                              
 }
 
-/*
- * my_tokenize — splits input by delim in-place.
- * Writes pointers into tokens[]. Returns token count.
- * WARNING: modifies input string.
- */
-int my_tokenize(char *input, char *tokens[], int max, char delim) { /* split input into tokens by delim, store pointers in tokens[], return count */
+  
+                                                
+                                                      
+                                  
+   
+int my_tokenize(char *input, char *tokens[], int max, char delim) {                                                                                 
     int count = 0;
     int i = 0;
     int len = my_strlen(input);
 
-    while (i < len && input[i] == delim) i++;   /* skip leading */
+    while (i < len && input[i] == delim) i++;                     
 
-    while (i < len && count < max) { /* while we have more input and space for tokens */
+    while (i < len && count < max) {                                                    
         tokens[count++] = &input[i];
-        while (i < len && input[i] != delim) i++; /* move i to next delim or end */
+        while (i < len && input[i] != delim) i++;                                  
         if (i < len) { input[i] = '\0'; i++; }    
-        while (i < len && input[i] == delim) i++;  /* skip consecutive */
+        while (i < len && input[i] == delim) i++;                        
     }
     return count;
 }

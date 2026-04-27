@@ -1,10 +1,10 @@
-/*
- * math.c  —  MiniOS Phase 1 Math Module
- * Implements multiply and divide without using * or / operators.
- */
+  
+                                        
+                                                                 
+   
 #include "math.h"
 
-/* Multiply using repeated addition */
+                                      
 int my_multiply(int a, int b) {
     int result = 0;
     int negative = 0;
@@ -14,7 +14,7 @@ int my_multiply(int a, int b) {
     return negative ? -result : result;
 }
 
-/* Integer division using repeated subtraction */
+                                                 
 int my_divide(int a, int b) {
     if (b == 0) return 0;
     int negative = 0;

@@ -1,11 +1,11 @@
-/*
- * parser.c — Tokenises raw input into a Command struct.
- * Phase 1: Mini OS
- */
+  
+                                                        
+                   
+   
 #include "parser.h"
 #include "string.h"
 
-/* Strip trailing whitespace and newline characters in-place */
+                                                               
 static void rtrim(char *s) {
     int len = my_strlen(s);
     while (len > 0 && (s[len-1] == '\n' || s[len-1] == '\r' ||
@@ -20,12 +20,12 @@ static void safe_copy(char *dst, const char *src, int max) {
     dst[i] = '\0';
 }
 
-/*
- * parse_command — modifies input in-place.
- * Fills cmd->cmd  with the first token.
- * Fills cmd->args with remaining tokens.
- * Returns 1 on success, 0 on empty input.
- */
+  
+                                           
+                                        
+                                         
+                                          
+   
 int parse_command(char *input, Command *cmd) {
     if (!input || !cmd) return 0;
 

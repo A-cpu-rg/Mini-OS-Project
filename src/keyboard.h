@@ -5,4 +5,19 @@
 
 int kb_read_line(char *buf);
 
+                                                           
+int kb_enable_nonblocking(void);
+
+  
+               
+           
+                                                          
+                                       
+                           
+   
+int kb_poll_line(char *out, int out_max);
+
+                                                                   
+int kb_input_in_progress(void);
+
 #endif

@@ -1,100 +1,88 @@
-# MiniOS — Phase 1
+# MiniOS — Custom Terminal-Based Operating System in C
 
-A minimal shell implemented in C using only raw system calls (`read`, `write`).  
-No standard library I/O (`printf`, `scanf`) is used anywhere.
+## Overview
+MiniOS is a small terminal-based “operating system” written in C that implements a custom shell and core OS-like subsystems without relying on standard library I/O. Phase 2 extends the system with a virtual memory allocator, an in-memory virtual file system, a cooperative task scheduler, and a structured terminal UI for clearer output and debugging.
 
----
+## Features
+- **Custom Shell (non-blocking)**: command loop with structured parsing and clean command dispatch
+- **Virtual Memory System**: 1MB RAM arena with a custom allocator (no `malloc/free`)
+- **Virtual File System**: in-memory files with `touch`, `write`, `read`, `ls`
+- **Task Scheduler**: cooperative background counter task (demonstration “tick” via `run`)
+- **Structured Terminal UI**: formatted output with status tags like `[OK]` / `[ERROR]`
+- **Memory Stats**: `mem` command to inspect allocator usage
 
-## Folder Structure
+## Architecture
+MiniOS is split into small modules, each isolated behind a header:
 
-```
-Mini-OS-Project/
-├── src/
-│   ├── main.c        # Entry point
-│   ├── shell.c/.h    # Shell REPL loop + command dispatch
-│   ├── parser.c/.h   # Tokenises raw input into Command struct
-│   ├── string.c/.h   # Custom string functions (no <string.h>)
-│   ├── math.c/.h     # Basic arithmetic (multiply, divide)
-│   ├── screen.c/.h   # Output via write()
-│   └── keyboard.c/.h # Input via read()
-├── Makefile
-└── README.md
-```
-
----
-
-## Modules
-
-### Shell (`shell.c`)
-- Displays a `miniOS> ` prompt
-- Reads a line with `kb_read_line()`
-- Parses and dispatches to the correct handler
-- Supported commands: `help`, `echo`, `math`, `clear`, `exit`
-
-### Parser (`parser.c`)
-- Splits raw input string into a `Command` struct
-- `cmd` holds the command name; `args[]` holds arguments
-- Uses the custom `my_tokenize()` from `string.c`
-
-### String (`string.c`)
-- `my_strlen()` — string length
-- `my_strcpy()` — string copy
-- `my_strcmp()` — string compare
-- `my_tokenize()` — split by delimiter
-- `my_int_to_str()` / `my_str_to_int()` — number conversion
-
-### Math (`math.c`)
-- `my_multiply(a, b)` — repeated addition
-- `my_divide(a, b)` — repeated subtraction
-- Add and subtract use native `+` / `-` operators in the shell
-
-### Screen (`screen.c`)
-- `screen_print(s)` — writes string to stdout via `write()`
-- `screen_print_line(s)` — prints with trailing newline
-- `screen_newline()` — prints a blank line
-
-### Keyboard (`keyboard.c`)
-- `kb_read_line(buf)` — reads one line via `read()`, strips newline
-
----
-
-## Build & Run
-
-```bash
-make        # compile
-make run    # compile and run
-make clean  # remove binaries
-```
-
----
+- **`shell.c`**: REPL loop, command routing, user-facing UX
+- **`parser.c`**: tokenization + `Command` structure construction
+- **`string.c`**: custom string utilities (no `<string.h>`)
+- **`math.c`**: arithmetic helpers used by the `math` command
+- **`memory.c`**: 1MB memory arena + allocator + memory statistics
+- **`filesystem.c`**: virtual in-memory files and basic file operations
+- **`scheduler.c`**: cooperative scheduler + background demo task(s)
+- **`screen.c`**: all terminal output via `write()`, including UI helpers
+- **`keyboard.c`**: input via `read()`
 
 ## Commands
+| Command | Description |
+|---|---|
+| `help` | Show available commands |
+| `echo <text...>` | Print text |
+| `math <a> <op> <b>` | Arithmetic (`+` `-` `*` `/`) |
+| `clear` | Clear screen + show boot banner |
+| `exit` | Quit MiniOS |
+| `touch <file>` | Create file (if missing) |
+| `write <file> <data...>` | Write data to a file (overwrites) |
+| `read <file>` | Read file contents |
+| `ls` | List files (with sizes) |
+| `run` | Run one scheduler tick (demo) |
+| `mem` | Show memory/allocator status |
 
-| Command              | Description                        |
-|----------------------|------------------------------------|
-| `help`               | Show available commands            |
-| `echo <text>`        | Print text to screen               |
-| `math <a> <op> <b>` | Arithmetic — op: `+` `-` `*` `/`  |
-| `clear`              | Clear the terminal                 |
-| `exit`               | Quit MiniOS                        |
-
-### Example
-
+## Sample Usage
 ```
-miniOS> echo Hello World
-$ echo Hello World
-Hello World
+## MiniOS v2.0 Loaded
+--------------------------------
+Type 'help' to begin
 
-miniOS> math 10 + 3
-$ math 10 + 3
-10 + 3 = 13
+miniOS:/home$ help
+[OK] MiniOS v2.0 — Commands
+...
 
-miniOS> math 15 / 4
-$ math 15 / 4
-15 / 4 = 3
+miniOS:/home$ touch notes.txt
+[OK] File 'notes.txt' created
 
-miniOS> help
-$ help
-MiniOS Phase 1  --  Available Commands
+miniOS:/home$ write notes.txt Hello from MiniOS
+[OK] Data written to 'notes.txt'
+
+miniOS:/home$ read notes.txt
+----- FILE: notes.txt -----
+Hello from MiniOS
+
+miniOS:/home$ ls
+[1] notes.txt    (17 bytes)
+
+miniOS:/home$ run
+[Scheduler] Counter: 120
+
+miniOS:/home$ mem
+[OK] Memory Status
 ...
 ```
+
+## Build & Run
+```bash
+make
+make run
+make clean
+```
+
+## Constraints
+- No `<string.h>`, `<math.h>`
+- No `malloc/free`
+- I/O is done via raw system calls (`read`, `write`)
+
+## Known Limitations
+- No persistent storage (VFS is in-memory only)
+- Cooperative scheduling (not preemptive)
+- Limited RAM (1MB arena)
