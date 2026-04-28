@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>MiniOS — Phase 1 Shell</title>
+  <title>MiniOS v2.0 Shell</title>
   <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;700&family=Inter:wght@400;600&display=swap" rel="stylesheet" />
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
@@ -173,10 +173,10 @@
   <header>
     <div class="logo">$</div>
     <div class="header-text">
-      <h1>MiniOS — Phase 1 Shell</h1>
-      <p>Basic shell · input/output · argument parsing · math</p>
+      <h1>MiniOS v2.0 Shell</h1>
+      <p>Shell · virtual files · memory · scheduler · structured feedback</p>
     </div>
-    <span class="badge">PHASE 1</span>
+    <span class="badge">V2.0</span>
   </header>
 
   <div class="window">
@@ -184,11 +184,11 @@
       <span class="dot red"></span>
       <span class="dot yellow"></span>
       <span class="dot green"></span>
-      <span class="titlebar-label">miniOS — bash</span>
+      <span class="titlebar-label">miniOS:/home</span>
     </div>
     <div id="output"></div>
     <div class="input-row">
-      <span class="ps1">miniOS&gt;&nbsp;</span>
+      <span class="ps1">miniOS:/home$&nbsp;</span>
       <input id="cmd-input" type="text" autocomplete="off" spellcheck="false" autofocus placeholder="type a command…" />
     </div>
   </div>
@@ -200,6 +200,14 @@
     <span class="chip" onclick="runChip('math 6 * 7')">math 6 * 7</span>
     <span class="chip" onclick="runChip('math 20 / 4')">math 20 / 4</span>
     <span class="chip" onclick="runChip('math 10 - 3')">math 10 - 3</span>
+    <span class="chip" onclick="runChip('touch demo.txt')">touch demo.txt</span>
+    <span class="chip" onclick="runChip('write demo.txt hello world')">write demo.txt hello world</span>
+    <span class="chip" onclick="runChip('read demo.txt')">read demo.txt</span>
+    <span class="chip" onclick="runChip('ls')">ls</span>
+    <span class="chip" onclick="runChip('mem')">mem</span>
+    <span class="chip" onclick="runChip('run')">run</span>
+    <span class="chip" onclick="runChip('add 5')">add 5</span>
+    <span class="chip" onclick="runChip('ecoh Hello World')">ecoh Hello World</span>
     <span class="chip" onclick="runChip('clear')">clear</span>
     <span class="chip" onclick="runChip('exit')">exit</span>
   </div>
@@ -208,6 +216,10 @@
   /* ── History ── */
   const history = [];
   let histIdx = -1;
+  const RAM_SIZE = 1024 * 1024;
+  const BLOCK_HEADER_SIZE = 16;
+  const scheduler = { counter: 0, activeTasks: 1 };
+  const files = [];
 
   /* ── Output helpers ── */
   const out = document.getElementById('output');
@@ -224,6 +236,119 @@
 
   /* ── String utility (mirrors string.c) ── */
   function myStrToInt(s) { return parseInt(s, 10) || 0; }
+  function myClamp(value, min, max) {
+    return Math.max(min, Math.min(max, value));
+  }
+  function myIntToStr(value) {
+    return String(value);
+  }
+  function align8(n) {
+    return (n + 7) & ~7;
+  }
+  function totalUsedMemory() {
+    return files.reduce((sum, file) => sum + align8(file.data.length + 1), 0);
+  }
+  function totalRawMemory() {
+    return files.reduce((sum, file) => sum + align8(file.data.length + 1) + BLOCK_HEADER_SIZE, 0);
+  }
+  function findFile(name) {
+    return files.find((file) => file.name === name) || null;
+  }
+  function isValidFileName(name) {
+    return !!name && name.length > 0 && name.length < 32;
+  }
+  function printSeparator(count = 32) {
+    addLine('-'.repeat(count), 'line-muted');
+  }
+  function printTitle(title) {
+    addBlank();
+    addLine(`## ${title}`, 'line-info');
+    printSeparator(32);
+  }
+  function printKv(key, value, padTo = 6, cls = 'line-output') {
+    addLine(`${key.padEnd(Math.max(key.length, padTo), ' ')}: ${value}`, cls);
+  }
+  function printOk(msg) {
+    addLine(`[OK] ${msg}`, 'line-output');
+  }
+  function printError(msg) {
+    addLine(`[ERROR] ${msg}`, 'line-error');
+  }
+  function printHint(msg) {
+    addLine(msg, 'line-yellow');
+  }
+  function levenshtein(a, b) {
+    const dp = Array.from({ length: a.length + 1 }, () => Array(b.length + 1).fill(0));
+    for (let i = 0; i <= a.length; i++) dp[i][0] = i;
+    for (let j = 0; j <= b.length; j++) dp[0][j] = j;
+    for (let i = 1; i <= a.length; i++) {
+      for (let j = 1; j <= b.length; j++) {
+        const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+        dp[i][j] = Math.min(
+          dp[i - 1][j] + 1,
+          dp[i][j - 1] + 1,
+          dp[i - 1][j - 1] + cost
+        );
+      }
+    }
+    return dp[a.length][b.length];
+  }
+  function suggestCommand(cmd) {
+    const commands = ['help', 'echo', 'math', 'add', 'touch', 'write', 'read', 'ls', 'delete', 'mem', 'run', 'clear', 'exit', 'quit'];
+    let best = null;
+    let bestScore = Infinity;
+    for (const candidate of commands) {
+      const score = levenshtein(cmd, candidate);
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+    return bestScore <= 2 ? best : null;
+  }
+  function isIntegerToken(value) {
+    return /^-?\d+$/.test(value || '');
+  }
+  function explainExpectedUsage(cmd) {
+    const messages = {
+      help: "This command does not need any extra input. Example: 'help'",
+      echo: "This command prints text. Example: 'echo Hello World'",
+      math: "This command needs two numbers and one operator. Example: 'math 8 + 2'",
+      add: "This command needs two numbers. Example: 'add 5 10'",
+      touch: "This command needs a filename. Example: 'touch notes.txt'",
+      write: "This command needs a filename and some text. Example: 'write notes.txt hello world'",
+      read: "This command needs a filename. Example: 'read notes.txt'",
+      delete: "This command needs a filename. Example: 'delete notes.txt'",
+      ls: "This command lists all virtual files. Example: 'ls'",
+      mem: "This command shows memory usage. Example: 'mem'",
+      run: "This command runs one scheduler tick. Example: 'run'",
+      clear: "This command clears the screen. Example: 'clear'",
+      exit: "This command closes MiniOS. Example: 'exit'",
+      quit: "This command closes MiniOS. Example: 'quit'"
+    };
+    return messages[cmd] || "Type 'help' to see the available commands.";
+  }
+  function handleExtraArgs(cmd, args) {
+    if (args.length > 0) {
+      printError(`The '${cmd}' command does not take extra arguments.`);
+      printHint(explainExpectedUsage(cmd));
+      return true;
+    }
+    return false;
+  }
+  function findClosestOperator(op) {
+    const operators = ['+', '-', '*', '/'];
+    let best = null;
+    let bestScore = Infinity;
+    for (const candidate of operators) {
+      const score = levenshtein(op, candidate);
+      if (score < bestScore) {
+        best = candidate;
+        bestScore = score;
+      }
+    }
+    return bestScore <= 1 ? best : null;
+  }
 
   /* ── Math module (mirrors math.c) ── */
   function myMultiply(a, b) {
@@ -254,23 +379,41 @@
 
   /* ── Command handlers ── */
   function handleHelp() {
-    addLine('MiniOS Phase 1  --  Available Commands', 'line-info');
-    addLine('──────────────────────────────────────', 'line-muted');
-    addLine('  help              Show this menu',            'line-output');
-    addLine('  echo <text...>    Print text to screen',      'line-output');
-    addLine('  math <a> <op> <b> Arithmetic: op is + - * /', 'line-output');
-    addLine('  clear             Clear the terminal',        'line-output');
-    addLine('  exit              Quit MiniOS',               'line-output');
+    printTitle('MiniOS v2.0 - Commands');
+    addLine('help                 Show this menu', 'line-output');
+    addLine('echo <text...>       Print text', 'line-output');
+    addLine('math <a> <op> <b>    Arithmetic: op is + - * /', 'line-output');
+    addLine('add <a> <b>          Quick addition helper', 'line-output');
+    addLine('touch <file>         Create file (if missing)', 'line-output');
+    addLine('write <file> <data>  Write data to file (overwrites)', 'line-output');
+    addLine('read <file>          Read file contents', 'line-output');
+    addLine('ls                   List files', 'line-output');
+    addLine('delete <file>        Delete file', 'line-output');
+    addLine('mem                  Show memory status', 'line-output');
+    addLine('run                  Run one scheduler tick (demo)', 'line-output');
+    addLine('clear                Clear screen + show boot banner', 'line-output');
+    addLine('exit                 Quit MiniOS', 'line-output');
+    printSeparator(32);
   }
 
   function handleEcho(args) {
-    if (args.length === 0) { addLine('', 'line-output'); return; }
+    if (args.length === 0) {
+      printError("The 'echo' command needs some text to print.");
+      printHint(explainExpectedUsage('echo'));
+      return;
+    }
     addLine(args.join(' '), 'line-output');
   }
 
   function handleMath(args) {
     if (args.length < 3) {
-      addLine('Usage: math <a> <op> <b>   (op: + - * /)', 'line-error');
+      printError("The 'math' command requires two numbers and an operator.");
+      printHint(explainExpectedUsage('math'));
+      return;
+    }
+    if (!isIntegerToken(args[0]) || !isIntegerToken(args[2])) {
+      printError("The 'math' command expects numbers on both sides of the operator.");
+      printHint(explainExpectedUsage('math'));
       return;
     }
     const a  = myStrToInt(args[0]);
@@ -283,17 +426,187 @@
     else if (op === '*') r = myMultiply(a, b);
     else if (op === '/') {
       r = myDivide(a, b);
-      if (r === null) { addLine('Error: division by zero', 'line-error'); return; }
+      if (r === null) { printError('division by zero'); return; }
     }
     else {
-      addLine('Error: unknown operator. Use + - * /', 'line-error');
+      printError(`Unknown operator: '${op}'`);
+      const maybeOp = findClosestOperator(op);
+      if (maybeOp) printHint(`Did you mean '${maybeOp}'? Example: 'math ${a} ${maybeOp} ${b}'`);
+      else printHint("Use one of these operators: +, -, *, /");
       return;
     }
-    addLine(`${a} ${op} ${b} = ${r}`, 'line-yellow');
+    printTitle('Math Result');
+    printKv('A', a, 6);
+    printKv('Op', op, 6);
+    printKv('B', b, 6);
+    printSeparator(16);
+    printKv('Result', r, 6, 'line-yellow');
+  }
+
+  function handleAdd(args) {
+    if (args.length < 2) {
+      printError("The 'add' command requires numbers. Example: 'add 5 10'");
+      return;
+    }
+    if (!isIntegerToken(args[0]) || !isIntegerToken(args[1])) {
+      printError("The 'add' command only works with numbers.");
+      printHint(explainExpectedUsage('add'));
+      return;
+    }
+    const a = myStrToInt(args[0]);
+    const b = myStrToInt(args[1]);
+    printTitle('Math Result');
+    printKv('A', a, 6);
+    printKv('Op', '+', 6);
+    printKv('B', b, 6);
+    printSeparator(16);
+    printKv('Result', a + b, 6, 'line-yellow');
+  }
+
+  function handleTouch(args) {
+    if (args.length < 1) {
+      printError("The 'touch' command needs a filename.");
+      printHint(explainExpectedUsage('touch'));
+      return;
+    }
+    const name = args[0];
+    if (!isValidFileName(name)) {
+      printError('cannot create file');
+      printHint("Use a short file name under 32 characters. Example: 'touch notes.txt'");
+      return;
+    }
+    if (args.length > 1) {
+      printError("The 'touch' command creates one file at a time.");
+      printHint(explainExpectedUsage('touch'));
+      return;
+    }
+    if (!findFile(name)) {
+      if (files.length >= 64) {
+        printError('cannot create file');
+        return;
+      }
+      files.push({ name, data: '' });
+    }
+    printOk(`File '${name}' created`);
+  }
+
+  function handleWrite(args) {
+    if (args.length < 2) {
+      printError("The 'write' command needs a filename and some text.");
+      printHint(explainExpectedUsage('write'));
+      return;
+    }
+    const name = args[0];
+    const data = args.slice(1).join(' ');
+    if (!isValidFileName(name)) {
+      printError('write failed (out of RAM / invalid name)');
+      printHint("Try a valid file name like 'write notes.txt hello'");
+      return;
+    }
+    const existing = findFile(name);
+    const currentRaw = totalRawMemory() - (existing ? align8(existing.data.length + 1) + BLOCK_HEADER_SIZE : 0);
+    const neededRaw = align8(data.length + 1) + BLOCK_HEADER_SIZE;
+    if (!existing && files.length >= 64) {
+      printError('write failed (out of RAM / invalid name)');
+      printHint('The virtual file table is full. Delete a file and try again.');
+      return;
+    }
+    if (currentRaw + neededRaw > RAM_SIZE) {
+      printError('write failed (out of RAM / invalid name)');
+      printHint('The virtual RAM is full. Delete some files or write smaller content.');
+      return;
+    }
+    if (existing) existing.data = data;
+    else files.push({ name, data });
+    printOk(`Data written to '${name}'`);
+  }
+
+  function handleRead(args) {
+    if (args.length < 1) {
+      printError("The 'read' command needs a filename.");
+      printHint(explainExpectedUsage('read'));
+      return;
+    }
+    if (args.length > 1) {
+      printError("The 'read' command accepts only one filename.");
+      printHint(explainExpectedUsage('read'));
+      return;
+    }
+    const file = findFile(args[0]);
+    if (!file) {
+      printError('File not found');
+      printHint(`Create it first with 'touch ${args[0]}' or check the file name with 'ls'.`);
+      return;
+    }
+    addLine(`----- FILE: ${file.name} -----`, 'line-info');
+    addLine(file.data, 'line-output');
+    printSeparator(24);
+  }
+
+  function handleDelete(args) {
+    if (args.length < 1) {
+      printError("The 'delete' command needs a filename.");
+      printHint(explainExpectedUsage('delete'));
+      return;
+    }
+    if (args.length > 1) {
+      printError("The 'delete' command removes one file at a time.");
+      printHint(explainExpectedUsage('delete'));
+      return;
+    }
+    const idx = files.findIndex((file) => file.name === args[0]);
+    if (idx < 0) {
+      printError('file not found');
+      printHint("Use 'ls' to check available files before deleting.");
+      return;
+    }
+    const [removed] = files.splice(idx, 1);
+    printOk(`File '${removed.name}' deleted`);
+  }
+
+  function handleLs() {
+    printTitle('Files in Virtual System');
+    if (files.length === 0) {
+      addLine('(empty)', 'line-muted');
+      printSeparator(32);
+      return;
+    }
+    files.forEach((file, idx) => {
+      const pad = myClamp(12 - file.name.length, 1, 12);
+      addLine(`[${myIntToStr(idx + 1)}] ${file.name}${' '.repeat(pad)}(${file.data.length} bytes)`, 'line-output');
+    });
+    printSeparator(32);
+  }
+
+  function handleMem() {
+    printTitle('Memory Status');
+    printKv('Total', '1 MB', 6);
+    printKv('Used', totalUsedMemory(), 6);
+    printKv('Free', RAM_SIZE - totalUsedMemory(), 6);
+    printSeparator(32);
+  }
+
+  function handleRun() {
+    scheduler.counter += scheduler.activeTasks;
+    printOk('Scheduler tick executed');
+    printKv('Tasks ran', scheduler.activeTasks, 10);
+    printKv('Counter', scheduler.counter, 10);
   }
 
   function handleClear() {
     out.innerHTML = '';
+    boot();
+  }
+
+  function handleUnknown(cmd) {
+    addLine(`Unknown command: '${cmd}'`, 'line-error');
+    const suggestion = suggestCommand(cmd);
+    if (suggestion) {
+      addLine(`Did you mean '${suggestion}'?`, 'line-yellow');
+      addLine(explainExpectedUsage(suggestion), 'line-muted');
+    } else {
+      addLine("Type 'help' to see the available commands.", 'line-muted');
+    }
   }
 
   /* ── Main executor ── */
@@ -302,24 +615,50 @@
     if (!trimmed) return true;
 
     /* echo the prompt + command */
-    addLine('miniOS> ' + raw, 'line-prompt');
+    addLine('miniOS:/home$ ' + raw, 'line-prompt');
 
     const parsed = parseCommand(raw);
     if (!parsed) return true;
 
     switch (parsed.cmd) {
-      case 'help':  handleHelp();              break;
+      case 'help':
+        if (handleExtraArgs('help', parsed.args)) break;
+        handleHelp();
+        break;
       case 'echo':  handleEcho(parsed.args);   break;
       case 'math':  handleMath(parsed.args);   break;
+      case 'add':   handleAdd(parsed.args);    break;
+      case 'touch': handleTouch(parsed.args);  break;
+      case 'write': handleWrite(parsed.args);  break;
+      case 'read':  handleRead(parsed.args);   break;
+      case 'ls':
+        if (handleExtraArgs('ls', parsed.args)) break;
+        handleLs();
+        break;
+      case 'delete': handleDelete(parsed.args); break;
+      case 'mem':
+        if (handleExtraArgs('mem', parsed.args)) break;
+        handleMem();
+        break;
+      case 'run':
+        if (handleExtraArgs('run', parsed.args)) break;
+        handleRun();
+        break;
       case 'clear': handleClear();             return true;
       case 'exit':
       case 'quit':
-        addLine('Goodbye! MiniOS shutting down.', 'line-muted');
+        if (parsed.args.length > 0) {
+          printError(`The '${parsed.cmd}' command does not take extra arguments.`);
+          printHint(explainExpectedUsage(parsed.cmd));
+          addBlank();
+          return true;
+        }
+        printOk('Goodbye!');
         addBlank();
         document.getElementById('cmd-input').disabled = true;
         return false;
       default:
-        addLine(`Unknown command: '${parsed.cmd}'  --  type 'help'`, 'line-error');
+        handleUnknown(parsed.cmd);
     }
 
     addBlank();
@@ -328,9 +667,10 @@
 
   /* ── Boot banner ── */
   function boot() {
-    addLine('MiniOS Phase 1 — Shell Ready', 'line-info');
-    addLine('────────────────────────────', 'line-muted');
-    addLine("Type 'help' for available commands.", 'line-muted');
+    addBlank();
+    addLine('## MiniOS v2.0 Loaded', 'line-info');
+    printSeparator(32);
+    addLine("Type 'help' to begin", 'line-muted');
     addBlank();
   }
 
