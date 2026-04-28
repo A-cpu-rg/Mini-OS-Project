@@ -64,5 +64,4 @@ make clean
 - `mem` shows allocator usage
 - `clear` redraws the boot banner cleanly
 
-## Screenshot / Recording
-- Add at least 3 screenshots or a 1-3 minute screen recording before submission.
+
